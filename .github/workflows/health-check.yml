@@ -47,5 +47,5 @@ jobs:
 
           git fetch origin
           git checkout qa
-          git merge origin/develop
+          git merge origin/develop --allow-unrelated-histories
           git push origin qa
