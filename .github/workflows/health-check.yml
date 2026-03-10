@@ -1,0 +1,24 @@
+name: FastAPI Health Check
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: |
+          cd health_check
+          docker build -t fastapi-health .
+
+      - name: Run health check
+        run: |
+          cd health_check
+          docker run fastapi-health
