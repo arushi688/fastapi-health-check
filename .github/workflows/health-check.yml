@@ -1,24 +1,62 @@
-name: FastAPI Health Check
+name: FastAPI Health Check Pipeline
 
 on:
-  push:
-    branches:
-      - main
+push:
+branches:
+- develop
 
 jobs:
-  test-health:
-    runs-on: ubuntu-latest
+test-health:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+```
+steps:
 
-      - name: Build Docker image
-        run: |
-          cd health_check
-          docker build -t fastapi-health .
+  - name: Checkout repository
+    uses: actions/checkout@v3
 
-      - name: Run health check
-        run: |
-          cd health_check
-          docker run fastapi-health
+  - name: Build FastAPI Docker image (DEV)
+    run: |
+      cd health_check
+      docker build --build-arg ENVIRONMENT=dev -t fastapi-health:dev .
+
+  - name: Start FastAPI container
+    run: |
+      docker run -d -p 8000:8000 --name fastapi-app fastapi-health:dev
+      sleep 5
+
+  - name: Build Test Runner
+    run: |
+      docker build -t test-runner ./test_runner
+
+  - name: Run Test Runner
+    run: |
+      docker run --network host test-runner
+
+  - name: Stop container
+    if: always()
+    run: |
+      docker stop fastapi-app
+      docker rm fastapi-app
+```
+
+promote-to-qa:
+needs: test-health
+runs-on: ubuntu-latest
+if: success()
+
+```
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v3
+
+  - name: Merge develop into qa
+    run: |
+      git config --global user.name "github-actions"
+      git config --global user.email "actions@github.com"
+
+      git fetch origin
+      git checkout qa
+      git merge origin/develop
+      git push origin qa
+```

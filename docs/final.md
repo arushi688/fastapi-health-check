@@ -16,25 +16,36 @@ skinparam ranksep 50
 skinparam defaultFontSize 13
 skinparam roundcorner 15
 
-* CI/CD
-** Trigger Workflow
-*** PR / Merge to main
-*** GitHub Actions Triggered
-*** Install Dependencies
-** Test Suites
-*** Functional Tests
-*** Performance Tests
-*** Load Tests
-*** Code Coverage
-** Quality Gates
+title Testing CI/CD
+*:Trigger Workflow
+* PR / Merge to main
+* GitHub Actions Triggered
+* Install Dependencies
+;
+
+**: Docker Build
+*** Build Image
+*** Tag Version
+*** Push to Registry
+;
+***: Test Suites
+**** Functional Tests
+**** Performance Tests
+**** Load Tests
+**** Code Coverage
+;
+****:Quality Gates
 *** Functional Pass ≥ 95%
 *** Coverage ≥ 80%
 *** Error Rate < 0.1%
 *** No Flaky Tests
-** Docker Build
-*** Build Image
-*** Tag Version
-*** Push to Registry
+;
+***** Release to Prod ??
+*****: Notify
+* Slack
+* Email
+* WA
+;
 
 @endmindmap
 ```
