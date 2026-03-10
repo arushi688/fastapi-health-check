@@ -1,7 +1,8 @@
 import requests
 import sys
 
-URL = "http://host.docker.internal:8000/health"
+
+URL = "http://localhost:8000/health"
 
 try:
     r = requests.get(URL)
