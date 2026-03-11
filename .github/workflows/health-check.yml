@@ -38,7 +38,6 @@ jobs:
   promote-to-qa:
     needs: test-health
     runs-on: ubuntu-latest
-    if: github.ref_name == 'develop'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,7 +51,14 @@ jobs:
           git fetch origin
           git checkout qa
 
-          # make qa exactly match develop
           git reset --hard origin/develop
 
           git push origin qa --force
+
+      - name: Trigger QA workflow
+        run: |
+          curl -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/${{ github.repository }}/actions/workflows/qa-health-check.yml/dispatches \
+          -d '{"ref":"qa"}'

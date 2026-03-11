@@ -1,9 +1,7 @@
 name: FastAPI QA Health Check
 
 on:
-  push:
-    branches:
-      - qa
+  workflow_dispatch:
 
 jobs:
   test-health-qa:
