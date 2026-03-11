@@ -5,12 +5,15 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: write
+
 jobs:
   test-health:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Build FastAPI Docker image
         run: cd health_check && docker build --build-arg ENVIRONMENT=dev -t fastapi-health:dev .
@@ -37,7 +40,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref_name == 'develop'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Promote develop to qa
         run: |
