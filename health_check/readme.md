@@ -1,13 +1,41 @@
-# FastAPI Health Check CI/CD
+# FastAPI Health Check CI/CD Pipeline
 
-This project demonstrates **automated API health testing using FastAPI, Docker, and GitHub Actions**.  
-It provides a simple health endpoint and a CI pipeline that validates the API status code during every push.
-
-The goal is to simulate how **API health monitoring works in real CI/CD pipelines**.
+Automated API health testing with Docker and GitHub Actions demonstrating real-world CI/CD practices.
 
 ---
 
-## Workflow Diagram
+##  What This Does
+
+Tests a FastAPI health endpoint automatically through **three environments** (Dev → QA → Production) with manual approval before production.
+
+---
+
+##  Project Structure
+
+```
+testing/
+├── .github/workflows/
+│   ├── health-check.yml       # Dev pipeline (auto on push to develop)
+│   └── qa-health-check.yml    # QA/Prod pipeline (manual dispatch)
+├── health_check/
+│   ├── app/
+│   │   ├── main.py           # FastAPI app with /health endpoint
+│   │   └── config.py         # Environment config loader
+│   ├── env/
+│   │   ├── dev.env           # Development config
+│   │   ├── qa.env            # QA config
+│   │   └── prod.env          # Production config
+│   ├── Dockerfile            # Application container
+│   └── requirements.txt
+└── test_runner/
+    ├── runner.py             # HTTP health check test
+    ├── Dockerfile            # Test container
+    └── requirements.txt
+```
+
+---
+
+##  Workflow Diagram
 
 ```plantuml
 @startuml
@@ -56,35 +84,150 @@ QACI --> Developer : Workflow success
 @enduml
 ```
 
-## Workflow
+## Pipeline Flow Summary
 
-1. **Developer push**
-   The workflow starts when a developer pushes code to the `develop` branch.  
-   This automatically triggers the GitHub Actions CI pipeline.
+```
+Push to develop
+      ↓
+Build Dev Image → Start Container → Run Tests
+      ↓ (pass)
+Promote to QA Branch
+      ↓
+Build QA Image → Start Container → Run Tests
+      ↓ (pass)
+⏸️  Manual Approval Gate
+      ↓ (approved)
+Deploy to Production 
+```
 
-2. **CI pipeline (development environment)**
-   The pipeline builds a Docker image for the FastAPI application using the development configuration.  
-   Then it starts the FastAPI container on port `8000`.
+---
 
-3. **Automated testing**
-   After the application container starts, a separate test-runner container is executed.  
-   This container performs a black-box health check by calling the `/health` endpoint.  
-   If the API returns HTTP `200`, the tests pass and the pipeline continues.
+##  Quick Start
 
-4. **Container cleanup**
-   Once the tests complete, the pipeline stops and removes the FastAPI container to keep the environment clean.
+### Run Locally
+```bash
+cd health_check
+docker build --build-arg ENVIRONMENT=dev -t fastapi-health:dev .
+docker run -p 8000:8000 fastapi-health:dev
 
-5. **Automatic promotion to QA**
-   After successful testing in development, the pipeline automatically promotes the code from the `develop` branch to the `qa` branch.  
-   This promotion triggers the QA pipeline.
+# Test the endpoint
+curl http://localhost:8000/health
+# Response: {"status": "ok", "environment": "dev"}
+```
 
-6. **QA pipeline**
-   In the QA stage, the application is rebuilt using the QA environment configuration.  
-   The container starts again and the same test-runner container executes the health check tests to validate the QA build.
+### Trigger CI Pipeline
+```bash
+git push origin develop  # Auto-triggers dev pipeline
+```
 
-7. **Manual approval gate**
-   Once the QA tests pass, the pipeline pauses and requires manual approval before deploying to production.  
-   This approval step ensures that nothing reaches production without human validation.
+### Approve Production Deployment
+1. Go to **Actions** tab in GitHub
+2. Find the paused QA workflow
+3. Click **Review deployments** → Approve
 
-8. **Production deployment**
-   After approval, the pipeline proceeds to the production deployment stage.
+---
+
+## Key Components
+
+| Component | Purpose | Details |
+|-----------|---------|---------|
+| **FastAPI App** | Health endpoint | Returns `{"status": "ok", "environment": "<env>"}` |
+| **Test Runner** | Black-box testing | Validates `/health` returns HTTP 200 |
+| **Docker** | Containerization | Consistent builds across all environments |
+| **GitHub Actions** | CI/CD Automation | Builds, tests, and promotes code |
+| **Environment Files** | Configuration | Separate configs for dev/qa/prod |
+
+---
+
+##  Docker Architecture
+
+```
+┌─ GitHub Actions Runner ──────────┐
+│                                   │
+│  FastAPI Container (port 8000)   │
+│         ↑                         │
+│         │ HTTP GET /health        │
+│         │                         │
+│  Test Runner (--network host)    │
+└───────────────────────────────────┘
+```
+
+**Why `--network host`?** Allows test container to access FastAPI on `localhost:8000`
+
+---
+
+##  Workflow Details
+
+### **Dev Pipeline** (health-check.yml)
+- **Trigger**: Push to `develop` branch
+- **Steps**:
+  1. Build FastAPI Docker image with `ENVIRONMENT=dev`
+  2. Start container on port 8000
+  3. Build and run test runner
+  4. Cleanup containers (always runs even on failure)
+  5. Promote code to `qa` branch
+  6. Trigger QA workflow via GitHub API
+
+### **QA/Prod Pipeline** (qa-health-check.yml)
+- **Trigger**: Manual dispatch (called by dev pipeline)
+- **Jobs**:
+  1. **test-health-qa**: Build & test with QA config
+  2. **manual-approval**: Wait for human approval (uses GitHub `environment: production`)
+  3. **deploy-production**: Deploy after approval
+
+---
+
+##  DevOps Concepts
+
+ **GitOps** - Branch-based environment promotion  
+ **Containerization** - Docker for consistent deployments  
+ **Automated Testing** - CI runs tests on every push  
+ **Progressive Delivery** - Staged rollout with approval gates  
+ **Environment Management** - Config separation via `.env` files  
+ **Infrastructure as Code** - GitHub Actions workflows  
+
+---
+
+## 🔧 Environment Configuration
+
+Configs are injected at **build time** using Docker `ARG`:
+
+```yaml
+# dev.env
+ENVIRONMENT=dev
+API_KEY=dev123
+BASE_URL=https://dev.api
+
+# qa.env
+ENVIRONMENT=qa
+API_KEY=qa_key
+BASE_URL=https://qa.api
+```
+
+---
+
+## Best Practices Implemented
+
+1. **Always cleanup**: `if: always()` ensures containers are removed
+2. **Manual gates**: Production requires human approval
+3. **Separate configs**: Never share credentials across environments
+4. **Black-box testing**: Test runner is independent of app code
+5. **Force push to QA**: Ensures QA branch exactly matches develop
+6. **Minimal permissions**: Workflows only have required permissions
+
+---
+
+## Testing
+
+The test runner performs a simple health check:
+```python
+response = requests.get("http://localhost:8000/health")
+# Expects: status_code == 200
+```
+
+**Pass**: Pipeline continues  
+**Fail**: Pipeline stops immediately
+
+---
+
+**Questions?** Check the workflow logs in GitHub Actions!
